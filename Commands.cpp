@@ -5,7 +5,6 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
-#include <unistd.h>
 #include "Commands.h"
 
 using namespace std;
@@ -79,31 +78,59 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 void ChPromptCommand::execute() {
-  const char* cmd_line = retriveCMD();
-  //std::cout << "\nchpromptCommand: " <<string(cmd_line); //debugging purpose
-  string cmd_s = _trim(string(cmd_line));
-  auto cmd_bs = cmd_s.find_first_of(" ");
-  //std::cout << "\nr - chprompt - exe\n"; //debugging purpose
-  if (cmd_bs != std::string::npos) {
-    string new_p = cmd_s.substr(cmd_bs+1, cmd_s.find_first_of(" \n"));
-    new_p.push_back('>');
-    changeMessage(new_p);
-  }
-  else {
-    changeMessage("smash>");
-  }
+    const char* cmd_line = retriveCMD();
+    //std::cout << "\nchpromptCommand: " <<string(cmd_line); //debugging purpose
+    string cmd_s = _trim(string(cmd_line));
+    auto cmd_bs = cmd_s.find_first_of(" ");
+    //std::cout << "\nr - chprompt - exe\n"; //debugging purpose
+    if (cmd_bs != std::string::npos) {
+        string new_p = cmd_s.substr(cmd_bs+1, cmd_s.find_first_of(" \n"));
+        new_p.push_back('>');
+        changePromptMessage(new_p);
+    }
+    else {
+        changePromptMessage("smash>");
+    }
 }
+
 void ShowPidCommand::execute(){
     cout << "smash pid is "<< getpid() <<endl;
 }
-void GetCurrDirCommand::execute(){
-  char curr_dir[256];
-  getcwd(curr_dir,strlen(curr_dir));
-  cout << curr_dir << endl;
+
+void GetCurrDirCommand::execute() {
+    char cwd[COMMAND_ARGS_MAX_LENGTH];
+    getcwd(cwd, sizeof(cwd));
+    std::cout << cwd <<"\n";
 }
 
+void ChangeDirCommand::execute() {
+    const char* cmd_line = retriveCMD();
+    string cmd_s = _trim(string(cmd_line));
+    auto cmd_bs = cmd_s.find_first_of(" ");
+    char cwd[COMMAND_ARGS_MAX_LENGTH];
+    getcwd(cwd, sizeof(cwd));
+    if (cmd_bs != std::string::npos) {
+        string dir = cmd_s.substr(cmd_bs+1, cmd_s.find_first_of(" \n"));
+        if (dir.find_first_of(" ") == std::string::npos) {
+            std::cout << "smash error: cd: too many arguments\n";
+        }
+        else if (dir == "-") {
+            const char* lpwd = this->plastPwd;
+            if (!lpwd) {
+                std::cout << "smash error: cd: OLDPWD not set\n";
+            }
+            else {
+                chdir(lpwd);
+            }
+        }
+        else if (chdir(dir.c_str()) != 0) {
+            perror("smash error: cd failed");
+        }
+        this->plastPwd = cwd;
+    }
+}
 
-SmallShell::SmallShell(): new_p("smash>") {
+SmallShell::SmallShell(): new_p("smash>"), plastPwd(nullptr) {
 // TODO: add your implementation
 }
 
@@ -117,19 +144,21 @@ SmallShell::~SmallShell() {
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
   //std::cout << "\nr - createcmd"; //debugging purpose
-  ///string chpromt_command = "chpromt";
-  string cmd_s = _trim(string(cmd_line));
-  string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-  if (firstWord.compare(string("chpromt")) == 0) {
-    return new ChPromptCommand(cmd_line);
-  }
-  if (firstWord.compare("showpid") == 0) {
-    return new ShowPidCommand(cmd_line);
-  }
-  else if (firstWord.compare("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  /*else if ...
+    string cmd_s = _trim(string(cmd_line));
+    string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+    if (firstWord.compare("chprompt") == 0) {
+        return new ChPromptCommand(cmd_line);
+    }
+    else if (firstWord.compare("showpid") == 0) {
+        return new ShowPidCommand(cmd_line);
+    }
+    else if (firstWord.compare("pwd") == 0) {
+        return new GetCurrDirCommand(cmd_line);
+    }
+    else if (firstWord.compare("cd") == 0) {
+        return new ChangeDirCommand(cmd_line, &(this->plastPwd));
+    }
+  /* else if ...
   .....
   else {
     return new ExternalCommand(cmd_line);
@@ -143,10 +172,14 @@ void SmallShell::executeCommand(const char *cmd_line) {
   // for example:
   //std::cout << "\nr - executecmd"; //debugging purpose
   Command* cmd = CreateCommand(cmd_line);
-  //std::cout << "\n cmd has: " <<string(cmd->cmd_line); //debugging purpose
   cmd->execute();
   string cmd_s = _trim(string(cmd_line));
-  if(cmd_s.substr(0, cmd_s.find_first_of(" \n")) == "chpromt")
-    this->setNewPrompt(cmd->getMessage());
+  string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+  if (firstWord.compare("chprompt") == 0) {
+    this->setNewPrompt(cmd->getPromptMessage());
+  }
+  if (firstWord.compare("cd") == 0) {
+      this->updateLastPWD(cmd->plastPwd);
+  }
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }

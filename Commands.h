@@ -10,21 +10,20 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 
 class Command {
 // TODO: Add your data members
-  std::string message;
-
+  std::string prompt_message;
  public:
   const char* cmd_line;
-  Command(const char* cmd_line) : cmd_line(cmd_line) {}
+  Command(const char* cmd_line) : cmd_line(nullptr) {}
   virtual ~Command() {}
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
-  void changeMessage(std::string m) {
-    message = m;
+  void changePromptMessage(std::string m) {
+    prompt_message = m;
   }
-  std::string getMessage() {
-    return message;
+  std::string getPromptMessage() {
+    return prompt_message;
   }
   const char* retriveCMD() {
     return cmd_line;
@@ -71,21 +70,23 @@ class ChPromptCommand : public BuiltInCommand {
 
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
+  ChangeDirCommand(const char* cmd_line, char** plastPwd) : BuiltInCommand(cmd_line), plastPwd(nullptr) {}
   virtual ~ChangeDirCommand() {}
   void execute() override;
+  public:
+  char* plastPwd;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
  public:
-  GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+  GetCurrDirCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
   virtual ~GetCurrDirCommand() {}
   void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+  ShowPidCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
@@ -164,7 +165,8 @@ class CatCommand : public BuiltInCommand {
 class SmallShell {
  private:
   SmallShell();
-  std::string new_p; 
+  std::string new_p;
+  char* plastPwd; 
  public:
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
@@ -180,6 +182,9 @@ class SmallShell {
   // TODO: add extra methods as needed
   void setNewPrompt(std::string p) {
       new_p = p;
+  }
+  void updateLastPWD(char* p) {
+      plastPwd = p;
   }
   std::string retrivePrompt() {
     return new_p;

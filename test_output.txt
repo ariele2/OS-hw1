@@ -1,0 +1,3 @@
+smash> hello> smash pid is 11272
+hello> /home/ariel/testHW1
+hello> 
