@@ -11,6 +11,7 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 class Command {
 // TODO: Add your data members
   std::string message;
+
  public:
   const char* cmd_line;
   Command(const char* cmd_line) : cmd_line(cmd_line) {}
@@ -77,14 +78,14 @@ class ChangeDirCommand : public BuiltInCommand {
 
 class GetCurrDirCommand : public BuiltInCommand {
  public:
-  GetCurrDirCommand(const char* cmd_line);
+  GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
   virtual ~GetCurrDirCommand() {}
   void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
+  ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
   virtual ~ShowPidCommand() {}
   void execute() override;
 };

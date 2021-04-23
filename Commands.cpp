@@ -5,6 +5,7 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
+#include <unistd.h>
 #include "Commands.h"
 
 using namespace std;
@@ -79,10 +80,10 @@ void _removeBackgroundSign(char* cmd_line) {
 
 void ChPromptCommand::execute() {
   const char* cmd_line = retriveCMD();
-  std::cout << "\nchpromptCommand: " <<string(cmd_line); //debugging purpose
+  //std::cout << "\nchpromptCommand: " <<string(cmd_line); //debugging purpose
   string cmd_s = _trim(string(cmd_line));
   auto cmd_bs = cmd_s.find_first_of(" ");
-  std::cout << "\nr - chprompt - exe\n"; //debugging purpose
+  //std::cout << "\nr - chprompt - exe\n"; //debugging purpose
   if (cmd_bs != std::string::npos) {
     string new_p = cmd_s.substr(cmd_bs+1, cmd_s.find_first_of(" \n"));
     new_p.push_back('>');
@@ -92,6 +93,15 @@ void ChPromptCommand::execute() {
     changeMessage("smash>");
   }
 }
+void ShowPidCommand::execute(){
+    cout << "smash pid is "<< getpid() <<endl;
+}
+void GetCurrDirCommand::execute(){
+  char curr_dir[256];
+  getcwd(curr_dir,strlen(curr_dir));
+  cout << curr_dir << endl;
+}
+
 
 SmallShell::SmallShell(): new_p("smash>") {
 // TODO: add your implementation
@@ -106,19 +116,20 @@ SmallShell::~SmallShell() {
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
-  std::cout << "\nr - createcmd"; //debugging purpose
+  //std::cout << "\nr - createcmd"; //debugging purpose
+  ///string chpromt_command = "chpromt";
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-  if (firstWord.compare("chprompt") == 0) {
+  if (firstWord.compare(string("chpromt")) == 0) {
     return new ChPromptCommand(cmd_line);
   }
-/*  if (firstWord.compare("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  else if (firstWord.compare("showpid") == 0) {
+  if (firstWord.compare("showpid") == 0) {
     return new ShowPidCommand(cmd_line);
   }
-  else if ...
+  else if (firstWord.compare("pwd") == 0) {
+    return new GetCurrDirCommand(cmd_line);
+  }
+  /*else if ...
   .....
   else {
     return new ExternalCommand(cmd_line);
@@ -130,10 +141,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
   // for example:
-  std::cout << "\nr - executecmd"; //debugging purpose
+  //std::cout << "\nr - executecmd"; //debugging purpose
   Command* cmd = CreateCommand(cmd_line);
-  std::cout << "\n cmd has: " <<string(cmd->cmd_line); //debugging purpose
+  //std::cout << "\n cmd has: " <<string(cmd->cmd_line); //debugging purpose
   cmd->execute();
-  this->setNewPrompt(cmd->getMessage());
+  string cmd_s = _trim(string(cmd_line));
+  if(cmd_s.substr(0, cmd_s.find_first_of(" \n")) == "chpromt")
+    this->setNewPrompt(cmd->getMessage());
   // Please note that you must fork smash process for some commands (e.g., external commands....)
 }

@@ -1,10 +1,2 @@
 smash> 
 r - main
-r - getline
-r - executecmd
-r - createcmd
- cmd has: chprompt hello
-chpromptCommand: chprompt hello
-r - chprompt - exe
-hello> 
-r - main
