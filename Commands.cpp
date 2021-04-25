@@ -101,18 +101,13 @@ void GetCurrDirCommand::execute() {
 }
 
 void ChangeDirCommand::execute() {
-    const char* cmd_line = retriveCMD();
-    string cmd_s = _trim(string(cmd_line));
-    auto cmd_bs = cmd_s.find_first_of(" ");
-    char* cwd = new char[COMMAND_ARGS_MAX_LENGTH]();
+    char* cwd = new char[COMMAND_ARGS_MAX_LENGTH];
     getcwd(cwd, sizeof(cwd)); //hold current path
-    if (cmd_bs != std::string::npos) { //if we got more then just cd
-        string arguments = cmd_s.substr(cmd_bs+1);
-        string dir = cmd_s.substr(cmd_bs+1, cmd_s.find_first_of(WHITESPACE)); //if we find another space
-        if (dir.find_first_of(" ") == std::string::npos) {
+    if (args[1]) { //if we got more then just cd
+        if (args[2]) {
             std::cout << "smash error: cd: too many arguments\n";
         }
-        else if (dir == "-") { //if we want to go back to the prevoius path
+        else if (string(args[1]).compare(string("-")) == 0) { //if we want to go back to the prevoius path
             const char* lpwd = *(this->plastPwd);
             if (!lpwd) { //no last pwd
                 std::cout << "smash error: cd: OLDPWD not set\n";
@@ -121,10 +116,10 @@ void ChangeDirCommand::execute() {
                 chdir(lpwd);
             }
         }
-        else if (chdir(dir.c_str()) != 0) {
+        else if (chdir(args[1]) != 0) {
             perror("smash error: cd failed");
         }
-        delete[] *(this->plastPwd);
+        delete (this->plastPwd);
         this->plastPwd = &cwd; //update the last path
     }
 }
@@ -171,6 +166,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // for example:
     //std::cout << "\nr - executecmd"; //debugging purpose
     Command* cmd = CreateCommand(cmd_line);
+    cmd->args = new char*[COMMAND_ARGS_MAX_LENGTH];
     cmd->args_num = _parseCommandLine(cmd_line, cmd->args);
     cmd->execute();
     if (string((cmd->args)[0]).compare("chprompt") == 0) {
