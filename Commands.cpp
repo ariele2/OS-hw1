@@ -5,6 +5,7 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
+#include <ctime>
 #include "Commands.h"
 
 using namespace std;
@@ -78,8 +79,6 @@ void _removeBackgroundSign(char* cmd_line) {
 // TODO: Add your implementation for classes in Commands.h 
 
 void ChPromptCommand::execute() { 
-    //std::cout << "\nchpromptCommand: " <<string(cmd_line); //debugging purpose
-    //std::cout << "\nr - chprompt - exe\n"; //debugging purpose
     if (args[1]) {
         string new_p = string(args[1]);
         new_p.push_back('>');
@@ -91,13 +90,13 @@ void ChPromptCommand::execute() {
 }
 
 void ShowPidCommand::execute(){
-    cout << "smash pid is "<< getpid() <<endl;
+    cout << "smash pid is "<< getpid() << std::endl;
 }
 
 void GetCurrDirCommand::execute() {
     char cwd[COMMAND_ARGS_MAX_LENGTH];
     getcwd(cwd, sizeof(cwd));
-    std::cout << cwd <<"\n";
+    std::cout << cwd << std::endl;
 }
 
 void ChangeDirCommand::execute() {
@@ -106,8 +105,6 @@ void ChangeDirCommand::execute() {
     getcwd(cwd, sizeof(cwd));
     char* o_cwd = new char[COMMAND_ARGS_MAX_LENGTH];
     strcpy(o_cwd, cwd);
-    //std::cout << "o_cwd: " << string(o_cwd) << std::endl;
-    //std::cout << "cwd: " << string(cwd) << std::endl; //debugging
     if (args[1]) { //if we got more then just cd
       if (args[2]) {
           std::cout << "smash error: cd: too many arguments\n";
@@ -127,11 +124,9 @@ void ChangeDirCommand::execute() {
       else {
         success = chdir(args[1]);
         if (success == 0) {
-          std::cout << "entered here" << std::endl;
           delete *(this->plastPwd);
           *(this->plastPwd) = new char[COMMAND_ARGS_MAX_LENGTH];
           *(this->plastPwd) = o_cwd;
-          //std::cout <<"this->plastPwd: " << *(this->plastPwd) << std::endl;
         } 
         else {
           perror("smash error: cd failed");
@@ -139,6 +134,54 @@ void ChangeDirCommand::execute() {
       }
     }
 }
+
+//JobsList class methods implementation
+void JobsList::addJob(Command* cmd, bool isStopped) {
+  JobsList::JobEntry new_job;
+  time_t curr_time;
+  time(&curr_time);
+  new_job.cmd_name = (cmd->args)[1];
+  new_job.proccess_id = getppid(); //the addjob process should be called from child process and wait
+  new_job.time_created = curr_time;
+  new_job.stopped = isStopped;
+  (this->job_list).push_back(new_job);
+}
+
+void JobsList::printJobsList() {
+  int i = 1;
+  for (auto it = job_list.begin(); it != job_list.end(); it++) {
+    time_t curr_time;
+    time(&curr_time);
+    double time_to_print = difftime(curr_time,(*it).time_created);
+    std::cout<<"["<<i<<"] "<<(*it).cmd_name<<" "<<(*it).proccess_id<<" "<<time_to_print;
+    if ((*it).stopped) {
+      std::cout<<" "<<"(stopped)";
+    }
+  }
+}
+
+
+
+//before the print, dont forget to check if there are processes to remove.
+void JobsCommand::execute() {
+
+}
+void ExternalCommand::execute(){
+  std::cout << "external execute" <<std::endl;
+  pid_t child_pid = fork();
+  if (child_pid == -1) {
+    perror("smash error: fork failed");
+  }
+  else if (child_pid == 0) {
+    if (!(execv("/bin/bash", this->args))) {
+      perror("smash error: execv failed");
+    }
+  }
+  else {
+    wait(NULL);
+  }
+}
+
 
 SmallShell::SmallShell(): new_p("smash>"), plastPwd(nullptr) {
 // TODO: add your implementation
@@ -157,30 +200,29 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
     if (firstWord.compare("chprompt") == 0) {
-        return new ChPromptCommand(cmd_line);
+      return new ChPromptCommand(cmd_line);
     }
     else if (firstWord.compare("showpid") == 0) {
-        return new ShowPidCommand(cmd_line);
+      return new ShowPidCommand(cmd_line);
     }
     else if (firstWord.compare("pwd") == 0) {
-        return new GetCurrDirCommand(cmd_line);
+      return new GetCurrDirCommand(cmd_line);
     }
     else if (firstWord.compare("cd") == 0) {
-        return new ChangeDirCommand(cmd_line, this->plastPwd);
+      return new ChangeDirCommand(cmd_line, this->plastPwd);
     }
-    /* else if ...
-    .....
+    /*else if (firstWord.compare("jobs") == 0) {
+      return new JobsCommand(cmd_line);
+    }*/
     else {
       return new ExternalCommand(cmd_line);
     }
-    */
     return nullptr;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     // for example:
-    //std::cout << "\nr - executecmd"; //debugging purpose
     Command* cmd = CreateCommand(cmd_line);
     cmd->args = new char*[COMMAND_ARGS_MAX_LENGTH]();
     cmd->args_num = _parseCommandLine(cmd_line, cmd->args);
@@ -192,7 +234,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
         ChangeDirCommand* cmd2 = dynamic_cast<ChangeDirCommand*>(cmd);
         this->updateLastPWD(cmd2->plastPwd);
     }
-    
   // Please note that you must fork smash process for some commands (e.g., external commands....)
     delete[] cmd->args;
 }

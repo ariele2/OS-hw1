@@ -2,7 +2,8 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
-
+#include <list>
+#include <iterator>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 
@@ -10,7 +11,7 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 
 class Command {
   // TODO: Add your data members
-    std::string prompt_message;
+  std::string prompt_message;
   public:
     char** args;
     int args_num;
@@ -40,7 +41,7 @@ class BuiltInCommand : public Command {
 
 class ExternalCommand : public Command {
  public:
-  ExternalCommand(const char* cmd_line);
+  explicit ExternalCommand(const char* cmd_line) : Command(cmd_line) {}
   virtual ~ExternalCommand() {}
   void execute() override;
 };
@@ -107,11 +108,16 @@ class QuitCommand : public BuiltInCommand {
 class JobsList {
  public:
   class JobEntry {
-   // TODO: Add your data members
+    public:
+    std::string cmd_name;
+    int proccess_id;
+    time_t time_created;
+    bool stopped;
   };
- // TODO: Add your data members
+ private:
+  std::list<JobEntry> job_list;
  public:
-  JobsList();
+  JobsList(std::list<JobEntry> job_list) : job_list(job_list) {}
   ~JobsList();
   void addJob(Command* cmd, bool isStopped = false);
   void printJobsList();

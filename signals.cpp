@@ -7,10 +7,12 @@ using namespace std;
 
 void ctrlZHandler(int sig_num) {
 	// TODO: Add your implementation
+  std::cout<< "smash: got ctrl-Z";
 }
 
 void ctrlCHandler(int sig_num) {
   // TODO: Add your implementation
+  std::cout<< "smash: got ctrl-C";
 }
 
 void alarmHandler(int sig_num) {
