@@ -77,15 +77,11 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
-void ChPromptCommand::execute() {
-    const char* cmd_line = retriveCMD();
+void ChPromptCommand::execute() { 
     //std::cout << "\nchpromptCommand: " <<string(cmd_line); //debugging purpose
-    string cmd_s = _trim(string(cmd_line));
-    auto cmd_bs = cmd_s.find_first_of(" ");
     //std::cout << "\nr - chprompt - exe\n"; //debugging purpose
-    if (cmd_bs != std::string::npos) {
-        string arguments = cmd_s.substr(cmd_bs+1);
-        string new_p = cmd_s.substr(cmd_bs+1, arguments.find_first_of(WHITESPACE));
+    if (args[1]) {
+        string new_p = string(args[1]);
         new_p.push_back('>');
         changePromptMessage(new_p);
     }
@@ -111,7 +107,8 @@ void ChangeDirCommand::execute() {
     char* cwd = new char[COMMAND_ARGS_MAX_LENGTH]();
     getcwd(cwd, sizeof(cwd)); //hold current path
     if (cmd_bs != std::string::npos) { //if we got more then just cd
-        string dir = cmd_s.substr(cmd_bs+1, cmd_s.find_first_of(" \n")); //if we find another space
+        string arguments = cmd_s.substr(cmd_bs+1);
+        string dir = cmd_s.substr(cmd_bs+1, cmd_s.find_first_of(WHITESPACE)); //if we find another space
         if (dir.find_first_of(" ") == std::string::npos) {
             std::cout << "smash error: cd: too many arguments\n";
         }
@@ -174,13 +171,12 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // for example:
     //std::cout << "\nr - executecmd"; //debugging purpose
     Command* cmd = CreateCommand(cmd_line);
+    cmd->args_num = _parseCommandLine(cmd_line, cmd->args);
     cmd->execute();
-    string cmd_s = _trim(string(cmd_line));
-    string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-    if (firstWord.compare("chprompt") == 0) {
+    if (string((cmd->args)[0]).compare("chprompt") == 0) {
         this->setNewPrompt(cmd->getPromptMessage());
     }
-    if (firstWord.compare("cd") == 0) {
+    if (string((cmd->args)[0]).compare("cd") == 0) {
         ChangeDirCommand* cmd2 = dynamic_cast<ChangeDirCommand*>(cmd);
         this->updateLastPWD(cmd2->plastPwd);
     }

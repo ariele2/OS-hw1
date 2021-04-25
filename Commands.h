@@ -12,6 +12,8 @@ class Command {
   // TODO: Add your data members
     std::string prompt_message;
   public:
+    char** args;
+    int args_num;
     const char* cmd_line;
     Command(const char* cmd_line) : cmd_line(cmd_line) {}
     virtual ~Command() {}
