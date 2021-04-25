@@ -9,25 +9,25 @@
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 class Command {
-// TODO: Add your data members
-  std::string prompt_message;
- public:
-  const char* cmd_line;
-  Command(const char* cmd_line) : cmd_line(nullptr) {}
-  virtual ~Command() {}
-  virtual void execute() = 0;
-  //virtual void prepare();
-  //virtual void cleanup();
-  // TODO: Add your extra methods if needed
-  void changePromptMessage(std::string m) {
-    prompt_message = m;
-  }
-  std::string getPromptMessage() {
-    return prompt_message;
-  }
-  const char* retriveCMD() {
-    return cmd_line;
-  }
+  // TODO: Add your data members
+    std::string prompt_message;
+  public:
+    const char* cmd_line;
+    Command(const char* cmd_line) : cmd_line(cmd_line) {}
+    virtual ~Command() {}
+    virtual void execute() = 0;
+    //virtual void prepare();
+    //virtual void cleanup();
+    // TODO: Add your extra methods if needed
+    void changePromptMessage(std::string m) {
+        prompt_message = m;
+    }
+    std::string getPromptMessage() {
+        return prompt_message;
+    }
+    const char* retriveCMD() {
+        return cmd_line;
+    }
 };
 
 class BuiltInCommand : public Command {
@@ -70,11 +70,11 @@ class ChPromptCommand : public BuiltInCommand {
 
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd) : BuiltInCommand(cmd_line), plastPwd(nullptr) {}
-  virtual ~ChangeDirCommand() {}
-  void execute() override;
   public:
-  char* plastPwd;
+    char** plastPwd;
+    ChangeDirCommand(const char* cmd_line, char** plastPwd) : BuiltInCommand(cmd_line), plastPwd(nullptr) {}
+    virtual ~ChangeDirCommand() {}
+    void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
@@ -163,32 +163,32 @@ class CatCommand : public BuiltInCommand {
 
 
 class SmallShell {
- private:
-  SmallShell();
-  std::string new_p;
-  char* plastPwd; 
- public:
-  Command *CreateCommand(const char* cmd_line);
-  SmallShell(SmallShell const&)      = delete; // disable copy ctor
-  void operator=(SmallShell const&)  = delete; // disable = operator
-  static SmallShell& getInstance() // make SmallShell singleton
-  {
-    static SmallShell instance; // Guaranteed to be destroyed.
-    // Instantiated on first use.
-    return instance;
-  }
-  ~SmallShell();
-  void executeCommand(const char* cmd_line);
-  // TODO: add extra methods as needed
-  void setNewPrompt(std::string p) {
-      new_p = p;
-  }
-  void updateLastPWD(char* p) {
-      plastPwd = p;
-  }
-  std::string retrivePrompt() {
-    return new_p;
-  }
+  private:
+    SmallShell();
+    std::string new_p;
+  public:
+    char** plastPwd; 
+    Command* CreateCommand(const char* cmd_line);
+    SmallShell(SmallShell const&)      = delete; // disable copy ctor
+    void operator=(SmallShell const&)  = delete; // disable = operator
+    static SmallShell& getInstance() // make SmallShell singleton
+    {
+        static SmallShell instance; // Guaranteed to be destroyed.
+        // Instantiated on first use.
+        return instance;
+    }
+    ~SmallShell();
+    void executeCommand(const char* cmd_line);
+    // TODO: add extra methods as needed
+    void setNewPrompt(std::string p) {
+        new_p = p;
+    }
+    void updateLastPWD(char** p) {
+        plastPwd = p;
+    }
+    std::string retrivePrompt() {
+        return new_p;
+    }
 };
 
 #endif //SMASH_COMMAND_H_
