@@ -19,8 +19,6 @@ class Command {
     Command(const char* cmd_line) : cmd_line(cmd_line) {}
     virtual ~Command() {}
     virtual void execute() = 0;
-    //virtual void prepare();
-    //virtual void cleanup();
     // TODO: Add your extra methods if needed
     void changePromptMessage(std::string m) {
         prompt_message = m;
@@ -57,11 +55,12 @@ class PipeCommand : public Command {
 class RedirectionCommand : public Command {
  // TODO: Add your data members
  public:
-  explicit RedirectionCommand(const char* cmd_line);
+  bool is_append;
+  explicit RedirectionCommand(const char* cmd_line, bool is_append) : Command(cmd_line), is_append(is_append) {}
   virtual ~RedirectionCommand() {}
   void execute() override;
-  //void prepare() override;
-  //void cleanup() override;
+  void prepare();
+  void cleanup();
 };
 
 class ChPromptCommand : public BuiltInCommand {
@@ -175,6 +174,7 @@ class SmallShell {
     SmallShell();
     std::string new_p;
   public:
+    JobsList jobs;
     char** plastPwd; 
     Command* CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor

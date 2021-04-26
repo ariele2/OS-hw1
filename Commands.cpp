@@ -166,14 +166,75 @@ void JobsList::printJobsList() {
 void JobsCommand::execute() {
 
 }
+
+void RedirectionCommand::prepare() {
+  dup2(0, 4); //backing up stdin inside fd[4]
+  dup2(1, 5); //backing up stdout inside fd[5]
+  close(0);
+  close(1);
+  /*std::string w_spath, r_spath;
+  if (!(this->args)[1]) {// the > or >> sign shows up withough backspaces
+  std::string cmd_s = string((this->args)[0]);
+  r_spath = cmd_s.substr(0, cmd_s.find_first_of(">")); //path for the new "stdin"
+    if (cmd_s.find(">>") != string::npos) {
+      w_spath = cmd_s.substr(cmd_s.find_first_of(">")+2);
+    }
+    else {
+      w_spath = cmd_s.substr(cmd_s.find_first_of(">")+1);
+    }
+  }
+  else if (!(this->args)[2]) { //the > or >> sign shows up without one backspace
+    std::string cmd_a1 = string((this->args)[0]);
+    std::string cmd_a2 = string((this->args)[1]);
+    if (cmd_a1.find(">>") != string::npos || cmd_a1.find(">") != string::npos) { //backspace in first word
+      w_spath = cmd_a2;
+      r_spath = cmd_a1.substr(0, cmd_s.find_first_of(">"));
+    }
+    else {
+      r_spath = cmd_a1;
+      if (cmd_a1.find(">>") != string::npos) { //backspace in second word
+        w_spath = cmd_a2.substr(cmd_a2.find_first_of(">")+2);
+      }
+      else {
+        w_spath = cmd_a2.substr(cmd_a2.find_first_of(">")+1);
+      }
+    }
+  }
+  else { //3 arguments means the path is in the third one
+    w_spath = string((this->args)[2]);
+    r_spath = string((this->args)[0]);
+  }
+  const char* r_path = r_spath.c_str();
+  const char* w_path = w_spath.c_str();
+  open((r_path, O_RDONLY); //open the new stdin
+  if (!is_append) {
+    open((w_path, O_WRONLY|O_CREATE, S_IWUSR));
+  }
+  else {
+    open((w_path, O_WRONLY|O_CREATE|O_APPEND, S_IWUSR);
+  }*/
+}
+
+void RedirectionCommand::cleanup() {
+  close(0);
+  close(1);
+  dup(4); // restores fd[4] which is the stdin back to fd[0]
+  dup(5); // restores fd[5] which is the stdout back to fd[1]
+  close(4);
+  close(5);
+}
+
+void RedirectionCommand::execute() {
+  this->prepare();
+}
+
 void ExternalCommand::execute(){
-  std::cout << "external execute" <<std::endl;
   pid_t child_pid = fork();
   if (child_pid == -1) {
     perror("smash error: fork failed");
   }
   else if (child_pid == 0) {
-    if (!(execv("/bin/bash", this->args))) {
+    if (!(execv("~/bin/bash", this->args))) {
       perror("smash error: execv failed");
     }
   }
@@ -196,10 +257,16 @@ SmallShell::~SmallShell() {
 */
 Command* SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
-  //std::cout << "\nr - createcmd"; //debugging purpose
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-    if (firstWord.compare("chprompt") == 0) {
+    if (cmd_s.find(">") != std::string::npos || cmd_s.find(">>") != std::string::npos) {
+      bool is_append = false;
+      if (cmd_s.find(">>") != string::npos) {
+        is_append = true;
+      }
+      return new RedirectionCommand(cmd_line, is_append);
+    }
+    else if (firstWord.compare("chprompt") == 0) {
       return new ChPromptCommand(cmd_line);
     }
     else if (firstWord.compare("showpid") == 0) {
@@ -223,17 +290,38 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
     // for example:
+    bool bg_cmd = _isBackgroundCommand(cmd_line);
+    _removeBackgroundSign(cmd_line);
     Command* cmd = CreateCommand(cmd_line);
     cmd->args = new char*[COMMAND_ARGS_MAX_LENGTH]();
     cmd->args_num = _parseCommandLine(cmd_line, cmd->args);
-    cmd->execute();
-    if (string((cmd->args)[0]).compare("chprompt") == 0) {
-        this->setNewPrompt(cmd->getPromptMessage());
+    if (typeid(*cmd) == typeid(ExternalCommand)) { //external command
+      pid_t child_pid = fork();
+      if (child_pid == -1) {
+        perror("smash error: fork failed");
+      }
+      else if (child_pid == 0) {//child
+        cmd->execute();
+      }
+      else { //parent
+        if (!bg_cmd) {
+          wait(NULL);
+        }
+        else { //it's running in the bg so we need to add it to the job list
+          jobs.addJob(cmd, false);
+        }
+      }
     }
-    if (string((cmd->args)[0]).compare("cd") == 0) {
-        ChangeDirCommand* cmd2 = dynamic_cast<ChangeDirCommand*>(cmd);
-        this->updateLastPWD(cmd2->plastPwd);
+    else {
+      cmd->execute();
+      if (string((cmd->args)[0]).compare("chprompt") == 0) {
+          this->setNewPrompt(cmd->getPromptMessage());
+      }
+      if (string((cmd->args)[0]).compare("cd") == 0) {
+          ChangeDirCommand* cmd2 = dynamic_cast<ChangeDirCommand*>(cmd);
+          this->updateLastPWD(cmd2->plastPwd);
+      }
     }
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
+    // Please note that you must fork smash process for some commands (e.g., external commands....)
     delete[] cmd->args;
 }

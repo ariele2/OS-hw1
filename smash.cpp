@@ -18,14 +18,15 @@ int main(int argc, char* argv[]) {
     SmallShell& smash = SmallShell::getInstance();
     //to stop debugging, remove the i and do while(true)
     int i = 0;
-    while(i<200) {
+    while(i<10) {
+        i++;
         std::cout << smash.retrivePrompt() << " ";
-        //std::cout << "\nr - main\n"; //debugging purpose
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
-        //std::cout << "\nr - getline"; //debugging purpose
+        if (!std::cin) {
+            return 0;
+        }
         smash.executeCommand(cmd_line.c_str());
-        i++;
     }
     return 0;
 }
