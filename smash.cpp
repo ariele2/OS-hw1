@@ -6,6 +6,7 @@
 #include "signals.h"
 
 int main(int argc, char* argv[]) {
+    
     if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
         perror("smash error: failed to set ctrl-Z handler");
     }
@@ -28,5 +29,8 @@ int main(int argc, char* argv[]) {
         }
         smash.executeCommand(cmd_line.c_str());
     }
-    return 0;
+    /*char* args[2] = {"sleep 10", NULL}; 
+    execv("/bin/bash", args);
+    std::cout <<"reached" << std::endl;
+    return 0;*/
 }

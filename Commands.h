@@ -109,30 +109,32 @@ class JobsList {
   class JobEntry {
     public:
     std::string cmd_name;
-    int proccess_id;
+    int process_id;
     time_t time_created;
     bool stopped;
   };
  private:
-  std::list<JobEntry> job_list;
+  std::list<JobEntry*>* job_list;
  public:
-  JobsList(std::list<JobEntry> job_list) : job_list(job_list) {}
+  JobsList(std::list<JobEntry*>* job_list) : job_list(job_list) {}
   ~JobsList();
   void addJob(Command* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
+  JobEntry* getJobById(int jobId);
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
+  JobEntry* getJobByPos(int job_pos);
   // TODO: Add extra methods or modify exisitng ones as needed
 };
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
+ JobsList* jobs;
+  JobsCommand(const char* cmd_line, JobsList* jobs): BuiltInCommand(cmd_line), jobs(jobs) {}
   virtual ~JobsCommand() {}
   void execute() override;
 };
@@ -140,7 +142,8 @@ class JobsCommand : public BuiltInCommand {
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
+  JobsList* jobs;
+  KillCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), jobs(jobs) {}
   virtual ~KillCommand() {}
   void execute() override;
 };
@@ -174,7 +177,7 @@ class SmallShell {
     SmallShell();
     std::string new_p;
   public:
-    JobsList jobs;
+    JobsList* jobs;
     char** plastPwd; 
     Command* CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor

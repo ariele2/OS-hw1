@@ -1,4 +1,2 @@
 chprompt hello
-showpid
-pwd
-chprompt
+cd ..

@@ -137,34 +137,85 @@ void ChangeDirCommand::execute() {
 
 //JobsList class methods implementation
 void JobsList::addJob(Command* cmd, bool isStopped) {
-  JobsList::JobEntry new_job;
+  JobsList::JobEntry* new_job = new JobEntry();
   time_t curr_time;
   time(&curr_time);
-  new_job.cmd_name = (cmd->args)[1];
-  new_job.proccess_id = getppid(); //the addjob process should be called from child process and wait
-  new_job.time_created = curr_time;
-  new_job.stopped = isStopped;
-  (this->job_list).push_back(new_job);
+  new_job->cmd_name = string((cmd->args)[0]) + " " + string((cmd->args)[1]);
+  new_job->process_id = getppid(); //the addjob process should be called from child process and wait
+  new_job->time_created = curr_time;
+  new_job->stopped = isStopped;
+  (this->job_list)->push_back(new_job);
 }
 
 void JobsList::printJobsList() {
   int i = 1;
-  for (auto it = job_list.begin(); it != job_list.end(); it++) {
+  for (auto it = job_list->begin(); it != job_list->end(); it++) {
     time_t curr_time;
     time(&curr_time);
-    double time_to_print = difftime(curr_time,(*it).time_created);
-    std::cout<<"["<<i<<"] "<<(*it).cmd_name<<" "<<(*it).proccess_id<<" "<<time_to_print;
-    if ((*it).stopped) {
-      std::cout<<" "<<"(stopped)";
+    double time_to_print = difftime(curr_time,(*it)->time_created);
+    std::cout<<"["<<i<<"] "<<(*it)->cmd_name<<" : "<<(*it)->process_id<<" "<<time_to_print <<" secs\n";
+    if ((*it)->stopped) {
+      std::cout<<" "<<"(stopped)\n";
     }
+    i++;
   }
 }
 
+void JobsList::killAllJobs() {
 
+}
+
+JobsList::JobEntry* JobsList::getJobById(int jobId) {
+  for (auto it = job_list->begin(); it != job_list->end(); it++) {
+    if ((*it)->process_id == jobId) {
+      return *it;
+    } 
+  }
+  return nullptr;
+}
+
+void JobsList::removeJobById(int jobId) {
+  JobEntry* job_to_remove = getJobById(jobId);
+  if (!job_to_remove) {
+    return;
+  }
+  job_list->remove(job_to_remove);
+}
+
+JobsList::JobEntry* JobsList::getJobByPos(int job_pos) {
+  int i = 1;
+  for (auto it = job_list->begin(); it != job_list->end(); it++) {
+    if (i == job_pos) { 
+      return (*it);
+    }
+    i++;
+  }
+  return nullptr;
+}
+
+void KillCommand::execute() {
+  std::string s_arg1 = string((this->args)[1]);
+  std::string s_arg2 = string((this->args)[2]);
+  if (s_arg1.find_first_of("-") != 0) {
+    std::cerr << "smash error: kill: invalid arguments" << std::endl;
+  }
+  int signal_num = stoi(s_arg1.substr(1));
+  int job_pos = stoi(s_arg2);
+  JobsList::JobEntry* job_to_kill = jobs->getJobByPos(job_pos);
+  if (!job_to_kill) {
+    std::cerr << "smash error: kill: job-id "<<job_pos<<" does not exist\n";
+  }
+  else if (kill(job_to_kill->process_id, signal_num) == 0) {
+    std::cout << "signal number "<< signal_num <<"was sent to pid " << job_to_kill->process_id <<std::endl;
+  }
+  else {
+    perror("smash error: kill failed");
+  }
+}
 
 //before the print, dont forget to check if there are processes to remove.
 void JobsCommand::execute() {
-
+  jobs->printJobsList();
 }
 
 void RedirectionCommand::prepare() {
@@ -229,23 +280,28 @@ void RedirectionCommand::execute() {
 }
 
 void ExternalCommand::execute(){
-  pid_t child_pid = fork();
-  if (child_pid == -1) {
-    perror("smash error: fork failed");
+  int i=0;
+  std::string cmd;
+  while (this->args[i]) {
+    _removeBackgroundSign(this->args[i]);
+    cmd = cmd + string(this->args[i]) + " ";
+    i++;
   }
-  else if (child_pid == 0) {
-    if (!(execv("~/bin/bash", this->args))) {
+  char cmd_c[COMMAND_ARGS_MAX_LENGTH];
+  strcpy(cmd_c, cmd.c_str());
+  char* argsv[2] = {cmd_c, NULL};
+  std::cout << "argsv of external cmd: " << *argsv <<std::endl;
+  if (!(execv("/bin/bash", argsv))) {
       perror("smash error: execv failed");
-    }
   }
-  else {
-    wait(NULL);
-  }
+  std::cout <<"son reached a place he is not supposed to be.." << std::endl;
 }
 
 
 SmallShell::SmallShell(): new_p("smash>"), plastPwd(nullptr) {
 // TODO: add your implementation
+  std::list<JobsList::JobEntry*>* job_list = new std::list<JobsList::JobEntry*>();
+  this->jobs = new JobsList(job_list);
 }
 
 SmallShell::~SmallShell() {
@@ -278,20 +334,22 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("cd") == 0) {
       return new ChangeDirCommand(cmd_line, this->plastPwd);
     }
-    /*else if (firstWord.compare("jobs") == 0) {
-      return new JobsCommand(cmd_line);
-    }*/
+    else if (firstWord.compare("kill") == 0) {
+      return new KillCommand(cmd_line, this->jobs);
+    }
+    else if (firstWord.compare("jobs") == 0) {
+      return new JobsCommand(cmd_line, this->jobs);
+    }
     else {
       return new ExternalCommand(cmd_line);
     }
     return nullptr;
 }
 
-void SmallShell::executeCommand(const char *cmd_line) {
+void SmallShell::executeCommand(const char* cmd_line) {
     // TODO: Add your implementation here
     // for example:
-    bool bg_cmd = _isBackgroundCommand(cmd_line);
-    _removeBackgroundSign(cmd_line);
+    bool bg_cmd = _isBackgroundComamnd(cmd_line);
     Command* cmd = CreateCommand(cmd_line);
     cmd->args = new char*[COMMAND_ARGS_MAX_LENGTH]();
     cmd->args_num = _parseCommandLine(cmd_line, cmd->args);
@@ -301,6 +359,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
         perror("smash error: fork failed");
       }
       else if (child_pid == 0) {//child
+        setpgrp();
         cmd->execute();
       }
       else { //parent
@@ -308,7 +367,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
           wait(NULL);
         }
         else { //it's running in the bg so we need to add it to the job list
-          jobs.addJob(cmd, false);
+          jobs->addJob(cmd, false);
         }
       }
     }

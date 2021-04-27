@@ -1,3 +1,1 @@
-smash> hello> smash pid is 698
-hello> /home/ariel/testHW1
-hello> 
+smash> hello> hello> 
