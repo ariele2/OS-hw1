@@ -410,6 +410,12 @@ void KillCommand::execute() {
   }
   else if (kill(job_to_kill->process_id, signal_num) == 0) {
     std::cout << "signal number "<< signal_num <<" was sent to pid " << job_to_kill->process_id <<std::endl;
+    if (signal_num == SIGTSTP || signal_num == SIGSTOP) {
+      job_to_kill->stopped = true;
+    }
+    else if (signal_num == SIGCONT) {
+      job_to_kill->stopped = false;
+    }
   }
   else {
     perror("smash error: kill failed");
@@ -543,6 +549,9 @@ void SmallShell::executeCommand(const char* cmd_line) {
       }
       else { //parent
         if (!bg_cmd) {
+          if (!(cmd->args)[0]) {
+            return;
+          }
           int i = 0;
           std::string job_s;
           time_t curr_time;
