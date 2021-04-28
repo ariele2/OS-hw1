@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
     SmallShell& smash = SmallShell::getInstance();
     //to stop debugging, remove the i and do while(true)
     int i = 0;
-    while(i<10) {
+    while(i<80) {
         i++;
         std::cout << smash.retrivePrompt() << " ";
         std::string cmd_line;
@@ -29,8 +29,5 @@ int main(int argc, char* argv[]) {
         }
         smash.executeCommand(cmd_line.c_str());
     }
-    /*char* args[2] = {"sleep 10", NULL}; 
-    execv("/bin/bash", args);
-    std::cout <<"reached" << std::endl;
-    return 0;*/
+    return 0;
 }

@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include <iterator>
+#include <unistd.h>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 
@@ -52,17 +53,6 @@ class PipeCommand : public Command {
   void execute() override;
 };
 
-class RedirectionCommand : public Command {
- // TODO: Add your data members
- public:
-  bool is_append;
-  explicit RedirectionCommand(const char* cmd_line, bool is_append) : Command(cmd_line), is_append(is_append) {}
-  virtual ~RedirectionCommand() {}
-  void execute() override;
-  void prepare();
-  void cleanup();
-};
-
 class ChPromptCommand : public BuiltInCommand {
  public:
   ChPromptCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
@@ -96,7 +86,9 @@ class ShowPidCommand : public BuiltInCommand {
 class JobsList;
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-  QuitCommand(const char* cmd_line, JobsList* jobs);
+ public:
+  JobsList* jobs;
+  QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), jobs(jobs) {}
   virtual ~QuitCommand() {}
   void execute() override;
 };
@@ -108,6 +100,9 @@ class JobsList {
  public:
   class JobEntry {
     public:
+    JobEntry() = default;
+    JobEntry(std::string cmd_name, int process_id, time_t time_created, bool stopped) : 
+                                    cmd_name(cmd_name), process_id(process_id), time_created(time_created), stopped(stopped) {}
     std::string cmd_name;
     int process_id;
     time_t time_created;
@@ -118,15 +113,17 @@ class JobsList {
  public:
   JobsList(std::list<JobEntry*>* job_list) : job_list(job_list) {}
   ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
+  void addJob(Command* cmd, int child_pid, bool isStopped = false);
+  void addJob(JobEntry* job);
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();
   JobEntry* getJobById(int jobId);
   void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
+  JobEntry* getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
   JobEntry* getJobByPos(int job_pos);
+  int getJobsListSize();
   // TODO: Add extra methods or modify exisitng ones as needed
 };
 
@@ -151,7 +148,8 @@ class KillCommand : public BuiltInCommand {
 class ForegroundCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
+  JobsList* jobs;
+  ForegroundCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), jobs(jobs) {}
   virtual ~ForegroundCommand() {}
   void execute() override;
 };
@@ -159,7 +157,8 @@ class ForegroundCommand : public BuiltInCommand {
 class BackgroundCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  BackgroundCommand(const char* cmd_line, JobsList* jobs);
+  JobsList* jobs;
+  BackgroundCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), jobs(jobs) {}
   virtual ~BackgroundCommand() {}
   void execute() override;
 };
@@ -176,9 +175,11 @@ class SmallShell {
   private:
     SmallShell();
     std::string new_p;
+    int smash_pid = getpid();
   public:
     JobsList* jobs;
     char** plastPwd; 
+    JobsList::JobEntry* curr_fg_p;
     Command* CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
@@ -199,6 +200,9 @@ class SmallShell {
     }
     std::string retrivePrompt() {
         return new_p;
+    }
+    int getPid() {
+      return smash_pid;
     }
 };
 
