@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <string.h>
+#include <utility>
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -90,6 +91,15 @@ std::string _removeRedirectionSign(std::string cmd_s) {
     return cmd_s;
 }
 
+std::string _removeAllBgSign(std::string cmd_s) {
+  size_t pos = 0;
+  while ((pos = cmd_s.find("&", pos)) != std::string::npos) {
+    cmd_s.replace(pos, 1, " ");
+    pos += 1;
+  }
+  return cmd_s;
+}
+
 bool _isOnlyNumbers(char* line) {
   for (unsigned int i=0; i<strlen(line); i++) {
     if (!isdigit(line[i])) {
@@ -150,6 +160,51 @@ void prepareRedirection(char** args, bool is_append, int args_num) {
   }
 }
 
+std::pair<std::string,std::string> preparePipe(char** args, int args_num) {
+  std::string w_spath, r_spath;
+  if (!args[1]) {// the | or |& sign shows up without backspaces
+  std::string cmd_s = string(args[0]);
+    r_spath = cmd_s.substr(0, cmd_s.find_first_of("|"));
+    if (cmd_s.find("|&") != string::npos) {
+      w_spath = cmd_s.substr(cmd_s.find_first_of("|")+2);
+    }
+    else {
+      w_spath = cmd_s.substr(cmd_s.find_first_of("|")+1);
+    }
+  }
+  else if (!args[2]) { //the | or |& sign shows up without one backspace
+    std::string cmd_a1 = string(args[0]);
+    std::string cmd_a2 = string(args[1]);
+    if (cmd_a1.find("|&") != string::npos || cmd_a1.find("|") != string::npos) { //backspace after >
+      w_spath = cmd_a2;
+      r_spath = cmd_a1.substr(0, cmd_a1.find_first_of("|"));
+    }
+    else { //backspace after first word
+      r_spath = cmd_a1;
+      if (cmd_a2.find("|&") != string::npos) { 
+        w_spath = cmd_a2.substr(cmd_a2.find_first_of("|")+2);
+      }
+      else {
+        w_spath = cmd_a2.substr(cmd_a2.find_first_of("|")+1);
+      }
+    }
+  }
+  else { //3+ arguments
+    int i = 0;
+    while (i < args_num && string(args[i]).find("|") == std::string::npos) {
+      w_spath = w_spath + string(args[i]) + " ";
+      i++;
+    }
+    i++;
+    while (i < args_num) {
+      r_spath = r_spath + string(args[i]) + " ";
+      i++;
+    }
+    w_spath = _trim(w_spath);
+    r_spath = _trim(r_spath);
+  }
+  return (std::make_pair(w_spath, r_spath));
+}
 // TODO: Add your implementation for classes in Commands.h 
 
 void ChPromptCommand::execute() { 
@@ -228,20 +283,17 @@ void JobsList::addJob(Command* cmd, int child_pid, bool isStopped) {
   (this->job_list)->push_back(new_job);
 }
 
-void JobsList::addJob(JobEntry* job) {
-  (this->job_list)->push_back(job);
-}
-
 void JobsList::printJobsList() {
   int i = 1;
   for (auto it = job_list->begin(); it != job_list->end(); it++) {
     time_t curr_time;
     time(&curr_time);
     double time_to_print = difftime(curr_time,(*it)->time_created);
-    std::cout<<"["<<i<<"] "<<(*it)->cmd_name<<" : "<<(*it)->process_id<<" "<<time_to_print <<" secs\n";
+    std::cout<<"["<<i<<"] "<<(*it)->cmd_name<<" : "<<(*it)->process_id<<" "<<time_to_print <<" secs";
     if ((*it)->stopped) {
-      std::cout<<" "<<"(stopped)\n";
+      std::cout<<" "<<"(stopped)";
     }
+    std::cout<< std::endl;
     i++;
   }
 }
@@ -460,6 +512,111 @@ void ExternalCommand::execute(){
   if ((execv(argsv[0], argsv)) == -1) {
       perror("smash error: execv failed");
   }
+  std::cout << "child of  child 2 r" <<std::endl;
+}
+
+void PipeCommand::execute() {
+  std::pair<std::string,std::string> paths =  preparePipe(this->args, this->args_num);
+  std::string w_spath = paths.first;
+  std::string r_spath = paths.second;  
+  int cmd_pipe[2], status;
+  pipe(cmd_pipe);
+  pid_t child1_pid = fork();
+  if (child1_pid == -1) {
+    perror("smash error: fork failed");
+  }
+  else if (child1_pid == 0) {//child
+    setpgrp();
+    if (this->is_stderr) {
+      close(2);   //close stderr
+    }
+    else {
+      close(1);   //close stdout
+    }
+    close(cmd_pipe[0]);
+    dup(cmd_pipe[1]); //insert write side of pipe to stdout
+    //call the function.
+    SmallShell* smash = &(SmallShell::getInstance());
+    Command* cmd = smash->CreateCommand(w_spath.c_str());
+    cmd->args = new char*[COMMAND_ARGS_MAX_LENGTH]();
+    cmd->args_num = _parseCommandLine(w_spath.c_str(), cmd->args);
+    if (typeid(*cmd) == typeid(ExternalCommand)) { //external command
+        pid_t child_pid = fork();
+        if (child_pid == -1) {
+          perror("smash error: fork failed");
+        }
+        else if (child_pid == 0) {//child
+          setpgrp();
+          cmd->execute();
+        }
+        else { //parent
+          if (waitpid(child_pid, &status, WNOHANG) == -1) {
+              perror("smash error: waitpid failed");
+          }
+        }
+      }
+      else {
+        cmd->execute();
+        if (string((cmd->args)[0]).compare("chprompt") == 0) {
+          smash->setNewPrompt(cmd->getPromptMessage());
+        }
+        if (string((cmd->args)[0]).compare("cd") == 0) {
+          ChangeDirCommand* cmd2 = dynamic_cast<ChangeDirCommand*>(cmd);
+          smash->updateLastPWD(cmd2->plastPwd);
+        }
+      }
+    delete[] cmd->args;
+    exit(2);
+  }
+  else { //parent
+    pid_t child2_pid = fork();
+    if (child2_pid == -1) {
+      perror("smash error: fork failed");
+    }
+    else if (child2_pid == 0) {//child
+      setpgrp();
+      waitpid(child1_pid, &status, 0);
+      close(0);   //close stdin
+      close(cmd_pipe[1]);
+      dup(cmd_pipe[0]); //insert read side of pipe to stdout
+      //call the function
+      SmallShell* smash = &(SmallShell::getInstance());
+      Command* cmd = smash->CreateCommand(r_spath.c_str());
+      cmd->args = new char*[COMMAND_ARGS_MAX_LENGTH]();
+      cmd->args_num = _parseCommandLine(r_spath.c_str(), cmd->args);
+      if (typeid(*cmd) == typeid(ExternalCommand)) { //external command
+        pid_t child_pid = fork();
+        if (child_pid == -1) {
+          perror("smash error: fork failed");
+        }
+        else if (child_pid == 0) {//child
+          setpgrp();
+          cmd->execute();
+        }
+        else { //parent
+          if (waitpid(child_pid, &status, WNOHANG) == -1) {
+            perror("smash error: waitpid failed");
+          }
+        }
+      }
+      else {
+        cmd->execute();
+        if (string((cmd->args)[0]).compare("chprompt") == 0) {
+          smash->setNewPrompt(cmd->getPromptMessage());
+        }
+        if (string((cmd->args)[0]).compare("cd") == 0) {
+          ChangeDirCommand* cmd2 = dynamic_cast<ChangeDirCommand*>(cmd);
+          smash->updateLastPWD(cmd2->plastPwd);
+        }
+      }
+      delete[] cmd->args;
+      exit(2);
+    }
+    else {//parent
+      waitpid(child1_pid, &status, 0);
+      waitpid(child2_pid, &status, 0);
+    }
+  }
 }
 
 SmallShell::SmallShell(): new_p("smash>"), plastPwd(nullptr) {
@@ -478,7 +635,14 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-    if (firstWord.compare("chprompt") == 0) {
+    if (cmd_s.find("|") != std::string::npos || cmd_s.find("|&") != std::string::npos) {
+      bool is_stderr = false;
+      if (cmd_s.find("|&") != std::string::npos) {
+        is_stderr = true;
+      }
+      return new PipeCommand(cmd_line, is_stderr);
+    }
+    else if (firstWord.compare("chprompt") == 0) {
       return new ChPromptCommand(cmd_line);
     }
     else if (firstWord.compare("showpid") == 0) {
@@ -515,18 +679,23 @@ void SmallShell::executeCommand(const char* cmd_line) {
     // TODO: Add your implementation here
     // for example:
     int status;
+    bool bg_cmd = false;
     string cmd_s = _trim(string(cmd_line));
     cmd_s = _removeRedirectionSign(cmd_s); //a procedure needed if its a redirection
     const char* prepared_cmd = cmd_s.c_str();
+    char correct_cmd[COMMAND_ARGS_MAX_LENGTH];
+    strcpy(correct_cmd, prepared_cmd);
+    Command* cmd = CreateCommand(correct_cmd);
     cmd_s = _trim(string(cmd_line));
-    bool bg_cmd = _isBackgroundComamnd(cmd_line);
-    Command* cmd = CreateCommand(prepared_cmd);
+    if (_isBackgroundComamnd(cmd_line) && cmd_s.find("|&") == std::string::npos) {
+      bg_cmd = true;
+    }
     cmd->args = new char*[COMMAND_ARGS_MAX_LENGTH]();
     if (_isRedirection(cmd_line)) {
       bool is_append = false;
       char rdir_cmd[COMMAND_ARGS_MAX_LENGTH];
-      strcpy(rdir_cmd, cmd_line);
-      _removeBackgroundSign(rdir_cmd);
+      cmd_s = _removeAllBgSign(cmd_s);
+      strcpy(rdir_cmd, cmd_s.c_str());
       cmd->args_num = _parseCommandLine(rdir_cmd, cmd->args);
       if (cmd_s.find(">>") != string::npos) { 
         is_append = true;
@@ -534,6 +703,8 @@ void SmallShell::executeCommand(const char* cmd_line) {
       dup2(1, 5); //backing up stdout inside fd[5]
       close(1);
       prepareRedirection(cmd->args,is_append,cmd->args_num);
+      std::string curr_cmd = cmd_s.substr(0, cmd_s.find_first_of(">"));
+      cmd->args_num = _parseCommandLine(curr_cmd.c_str(), cmd->args);
     }
     else {
       cmd->args_num = _parseCommandLine(cmd_line, cmd->args);
@@ -550,6 +721,9 @@ void SmallShell::executeCommand(const char* cmd_line) {
       else { //parent
         if (!bg_cmd) {
           if (!(cmd->args)[0]) {
+            if (waitpid(child_pid, &status, WUNTRACED) == -1) {
+              perror("smash error: waitpid failed");
+            }
             return;
           }
           int i = 0;
@@ -562,7 +736,7 @@ void SmallShell::executeCommand(const char* cmd_line) {
           }
           job_s = job_s + string((cmd->args)[i]);
           this->curr_fg_p = new JobsList::JobEntry(job_s, child_pid, curr_time, false);
-          if (waitpid(child_pid, &status, 0) == -1) {
+          if (waitpid(child_pid, &status, WUNTRACED) == -1) {
             perror("smash error: waitpid failed");
           }
           delete this->curr_fg_p;

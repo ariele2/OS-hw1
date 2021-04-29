@@ -48,7 +48,8 @@ class ExternalCommand : public Command {
 class PipeCommand : public Command {
   // TODO: Add your data members
  public:
-  PipeCommand(const char* cmd_line);
+  bool is_stderr;
+  PipeCommand(const char* cmd_line, bool is_stderr) : Command(cmd_line), is_stderr(is_stderr) {}
   virtual ~PipeCommand() {}
   void execute() override;
 };
@@ -108,13 +109,11 @@ class JobsList {
     time_t time_created;
     bool stopped;
   };
- private:
-  std::list<JobEntry*>* job_list;
  public:
+  std::list<JobEntry*>* job_list;
   JobsList(std::list<JobEntry*>* job_list) : job_list(job_list) {}
   ~JobsList();
   void addJob(Command* cmd, int child_pid, bool isStopped = false);
-  void addJob(JobEntry* job);
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();
