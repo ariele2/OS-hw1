@@ -354,7 +354,7 @@ void ForegroundCommand::execute() {
   else if (jobs->getJobsListSize() == 0) {
     std::cout << "smash error: fg: jobs list is empty" << std::endl;
   }
-  else if (jobs->getJobsListSize() < stoi(string((this->args)[1]))) {
+  else if (((this->args)[1]) && jobs->getJobsListSize() < stoi(string((this->args)[1]))) {
     std::cout << "smash error: fg: job-id " << stoi(string((this->args)[1])) << " does not exist" << std::endl;
   }
   else {
@@ -366,10 +366,13 @@ void ForegroundCommand::execute() {
       fg_job = jobs->getLastJob(job_id);
     }
     std::cout << fg_job->cmd_name << " : " << *job_id << std::endl;
+    SmallShell::getInstance().curr_fg_p = new JobsList::JobEntry(fg_job->cmd_name, fg_job->process_id, fg_job->time_created, false);
     if (kill(*job_id, SIGCONT) != 0) {
       perror("smash error: kill failed");
     }
-    waitpid(*job_id, &status, 0);
+    if (waitpid(*job_id, &status, WUNTRACED) == -1) {
+      perror("smash error: waitpid failed");
+    }
     jobs->removeJobById(*job_id);
   }
   delete job_id;

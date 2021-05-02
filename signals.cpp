@@ -33,6 +33,7 @@ void ctrlCHandler(int sig_num) {
   if (kill(pid, SIGINT) != 0) {
     perror("smash error: kill failed");
   }
+  delete job;
   std::cout<< "smash: process " << pid << " was killed" <<std::endl;
 }
 
