@@ -441,6 +441,16 @@ void JobsList::killAllJobs() {
   }
 }
 
+void CatCommand::execute() {
+  int i = 1;
+  while (this->args[i]) {
+    // need to open the file in args[i]
+    // then read from it 
+    // print it (write) to the screen 
+    // close the files we have opened
+  }
+}
+
 void QuitCommand::execute() {
   if (!(this->args)[1]) {
     exit(1);
@@ -668,6 +678,9 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
     }
     else if (firstWord.compare("bg") == 0) {
       return new BackgroundCommand(cmd_line, this->jobs);
+    }
+    else if (firstWord.compare("cat") == 0) {
+      return new CatCommand(cmd_line, this->jobs);
     }
     else if (firstWord.compare("quit") == 0) {
       return new QuitCommand(cmd_line, this->jobs);

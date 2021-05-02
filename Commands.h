@@ -164,7 +164,7 @@ class BackgroundCommand : public BuiltInCommand {
 
 class CatCommand : public BuiltInCommand {
  public:
-  CatCommand(const char* cmd_line);
+  CatCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
   virtual ~CatCommand() {}
   void execute() override;
 };
