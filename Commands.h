@@ -37,10 +37,18 @@ class BuiltInCommand : public Command {
   explicit BuiltInCommand(const char* cmd_line) : Command(cmd_line) {}
   virtual ~BuiltInCommand() {}
 };
-
+class JobsList;
+class TimeoutsList;
 class ExternalCommand : public Command {
  public:
-  explicit ExternalCommand(const char* cmd_line) : Command(cmd_line) {}
+  TimeoutsList* timeouts;
+  JobsList* jobs;
+  unsigned int duration;
+  pid_t process_id;
+  ExternalCommand(const char* cmd_line, TimeoutsList* timeouts, JobsList* jobs) : 
+                            Command(cmd_line), timeouts(timeouts), jobs(jobs), duration(0), process_id(-2) {}
+  ExternalCommand(const char* cmd_line, TimeoutsList* timeouts, JobsList* jobs, unsigned int duration) : 
+                            Command(cmd_line), timeouts(timeouts), jobs(jobs), duration(duration) {}
   virtual ~ExternalCommand() {}
   void execute() override;
 };
@@ -84,7 +92,6 @@ class ShowPidCommand : public BuiltInCommand {
   void execute() override;
 };
 
-class JobsList;
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
  public:
@@ -169,6 +176,32 @@ class CatCommand : public BuiltInCommand {
   void execute() override;
 };
 
+class TimeoutsList{
+  public:
+    class Timeout {
+    public:
+    pid_t process_id;
+    time_t time_created;
+    unsigned int duration;
+    std::string cmd_name;
+    Timeout(std::string cmd_name, pid_t process_id, time_t time_created, unsigned int duration)
+            :process_id(process_id), time_created(time_created), duration(duration), cmd_name(cmd_name) {}
+    };
+private:
+    std::vector<Timeout> timeout_list;
+public:
+    TimeoutsList() : timeout_list(std::vector<Timeout>()) {}
+    ~TimeoutsList() = default;
+    void addTimeout(std::string cmd_name, pid_t process_id, time_t time_created, unsigned int duration);
+    unsigned int getDurationByPid(pid_t pid);
+    void killAllTimeouts();
+    void removeFinishedTimeouts();
+    Timeout* findTimeoutByTime(time_t curr_time);
+    void removeTimeoutByPid(pid_t pid);
+    unsigned int getSize();
+    pid_t getPidByIndex(unsigned int index);
+    unsigned int getClosestTimeout(pid_t* pid);
+};
 
 class SmallShell {
   private:
@@ -176,12 +209,16 @@ class SmallShell {
     std::string new_p;
     int smash_pid = getpid();
   public:
-    JobsList* jobs;
-    char** plastPwd; 
+    char** plastPwd;
+    TimeoutsList timeouts;
+    JobsList* jobs; 
     JobsList::JobEntry* curr_fg_p;
     Command* CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
+    TimeoutsList* getTimeoutsList() { 
+      return &(timeouts); 
+    }
     static SmallShell& getInstance() // make SmallShell singleton
     {
         static SmallShell instance; // Guaranteed to be destroyed.

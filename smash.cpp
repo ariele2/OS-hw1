@@ -15,12 +15,16 @@ int main(int argc, char* argv[]) {
     }
 
     //TODO: setup sig alarm handler
+    struct sigaction new_action;
+    new_action.sa_handler = alarmHandler;
+    new_action.sa_flags = SA_RESTART;
+    if(sigaction(SIGALRM, &new_action, NULL)<0){
+        perror("smash error: sigaction failed");
+    }
 
     SmallShell& smash = SmallShell::getInstance();
     //to stop debugging, remove the i and do while(true)
-    int i = 0;
-    while(i<80) {
-        i++;
+    while(true) {
         std::cout << smash.retrivePrompt() << " ";
         std::string cmd_line;
         std::getline(std::cin, cmd_line);

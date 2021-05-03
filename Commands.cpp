@@ -100,6 +100,12 @@ std::string _removeAllBgSign(std::string cmd_s) {
   return cmd_s;
 }
 
+double absolute(double a){
+    if(a>=0)
+        return a;
+    return (-a);
+}
+
 bool _isOnlyNumbers(char* line) {
   for (unsigned int i=0; i<strlen(line); i++) {
     if (!isdigit(line[i])) {
@@ -153,10 +159,14 @@ void prepareRedirection(char** args, bool is_append, int args_num) {
   }
   const char* w_path = w_spath.c_str();
   if (!is_append) {
-    open(w_path, O_WRONLY|O_CREAT, S_IWUSR);
+    if (open(w_path, O_WRONLY|O_CREAT, S_IWUSR) == -1) {
+      perror("smash error: open failed");
+    }
   }
   else {
-    open(w_path, O_WRONLY|O_CREAT|O_APPEND, S_IWUSR);
+    if (open(w_path, O_WRONLY|O_CREAT|O_APPEND, S_IWUSR) == -1) {
+      perror("smash error: open failed");
+    }
   }
 }
 
@@ -289,7 +299,7 @@ void JobsList::printJobsList() {
     time_t curr_time;
     time(&curr_time);
     double time_to_print = difftime(curr_time,(*it)->time_created);
-    std::cout<<"["<<i<<"] "<<(*it)->cmd_name<<" : "<<(*it)->process_id<<" "<<time_to_print <<" secs";
+    std::cout<< "["<<i<<"] "<< (*it)->cmd_name<<" : "<<(*it)->process_id<<" "<<time_to_print <<" secs";
     if ((*it)->stopped) {
       std::cout<<" "<<"(stopped)";
     }
@@ -421,6 +431,7 @@ void BackgroundCommand::execute() {
     else {
       bg_job = jobs->getLastStoppedJob(job_id);
     }
+    std::cout << bg_job->cmd_name << " : " << *job_id << std::endl;
     if (kill(*job_id, SIGCONT) != 0) {
       perror("smash error: kill failed");
     }
@@ -431,6 +442,7 @@ void BackgroundCommand::execute() {
 }
 
 void JobsList::killAllJobs() {
+
   std::cout << "sending SIGKILL signal to " << getJobsListSize() << " jobs:" <<std::endl;
   for (auto it = job_list->begin(); it != job_list->end(); it++) {
     int p_id = (*it)->process_id;
@@ -443,15 +455,34 @@ void JobsList::killAllJobs() {
 
 void CatCommand::execute() {
   int i = 1;
+  char buf[100];
+  ssize_t bytes_read;
   while (this->args[i]) {
-    // need to open the file in args[i]
-    // then read from it 
-    // print it (write) to the screen 
-    // close the files we have opened
+    std::string curr_file = _trim(string(this->args[i]));
+    int fd = open(curr_file.c_str(), O_RDONLY);
+    if (fd == -1) {
+      perror("smash error: open failed");
+      return;
+    }
+    bytes_read = read(fd, buf, 100);
+    while (bytes_read > 0) {
+      if (write(1, buf, bytes_read) == -1) {
+        perror("smash error: write failed");
+      }
+      bytes_read = read(fd, buf, 100);
+    }
+    if (bytes_read == -1) {
+      perror("smash error: read failed");
+    }
+    if (close(fd) == -1) {
+      perror("smash error: close failed");
+    }
+    i++;
   }
 }
 
 void QuitCommand::execute() {
+  jobs->removeFinishedJobs();
   if (!(this->args)[1]) {
     exit(1);
   }
@@ -514,6 +545,9 @@ void ExternalCommand::execute(){
   int i = 0;
   std::string cmd_s;
   char cmd_c[COMMAND_ARGS_MAX_LENGTH];
+  if (this->args_num > i && string((this->args)[i]).compare("timeout") == 0) {
+    i = 2;
+  }
   while (i < this->args_num && string((this->args)[i]).compare(string(">")) != 0 && string((this->args)[i]).compare(string(">>")) != 0) {
     cmd_s = cmd_s + string((this->args)[i]) + " ";
     i++;
@@ -521,7 +555,9 @@ void ExternalCommand::execute(){
   const char* tmp_cmd = cmd_s.c_str();
   strcpy(cmd_c, tmp_cmd);
   _removeBackgroundSign(cmd_c);
-  char* argsv[] = {"/bin/bash", "-c", cmd_c, NULL};
+  char path[] = "/bin/bash";
+  char path_arg[] = "-c";
+  char* argsv[] = {path, path_arg, cmd_c, NULL};
   if ((execv(argsv[0], argsv)) == -1) {
       perror("smash error: execv failed");
   }
@@ -632,7 +668,91 @@ void PipeCommand::execute() {
   }
 }
 
-SmallShell::SmallShell(): new_p("smash>"), plastPwd(nullptr) {
+//Timeouts:
+
+void TimeoutsList::addTimeout(std::string cmd, pid_t pid, time_t t_created, unsigned int duration){
+    Timeout new_timeout = Timeout(cmd, pid, t_created, duration);
+    timeout_list.push_back(new_timeout);
+}
+
+unsigned int TimeoutsList::getDurationByPid(pid_t pid) {
+  for(unsigned int i=0 ; i<timeout_list.size() ; i++) {
+    if(timeout_list[i].process_id == pid) {
+      return timeout_list[i].duration;
+    }
+  }
+  return 0;
+}
+
+void TimeoutsList::killAllTimeouts(){
+  for(unsigned int i=0 ; i<timeout_list.size() ; i++) {
+    if(kill(timeout_list[i].process_id , SIGKILL) < 0) {
+        perror("smash error: kill failed");
+    }
+  }
+}
+
+void TimeoutsList::removeTimeoutByPid(pid_t pid){
+  for(unsigned int i=0 ; i<timeout_list.size() ; i++) {
+    if(timeout_list[i].process_id == pid) {
+      timeout_list.erase(timeout_list.begin()+i);
+      return;
+    }
+  }
+}
+
+TimeoutsList::Timeout* TimeoutsList::findTimeoutByTime(time_t curr_time){
+  double c_duration, secs_left, closest;
+  if (timeout_list.size() == 0) {
+    return nullptr;
+  }
+  unsigned int index = 0;
+  for (unsigned int i=0 ; i < timeout_list.size() ; i++) {
+    c_duration = difftime(curr_time, timeout_list[i].time_created);
+    secs_left = c_duration - timeout_list[i].duration;
+    if (i==0) {
+      closest = absolute(secs_left);
+    }
+    else if(absolute(secs_left) < closest) {
+      closest = absolute(secs_left);
+      index = i;
+    }
+  }
+  return &(timeout_list[index]);
+}
+
+unsigned int TimeoutsList::getSize(){
+  return timeout_list.size();
+}
+
+pid_t TimeoutsList::getPidByIndex(unsigned int index){
+  if (index < timeout_list.size()) {
+    return (timeout_list[index].process_id);
+  }
+  return 0;
+}
+
+unsigned int TimeoutsList::getClosestTimeout(pid_t* pid){
+  time_t curr_time = time(NULL);
+  unsigned int min_duration = -1;
+  unsigned int secs_left;
+  for (unsigned int i=0 ; i < timeout_list.size() ; i++){
+    double c_duration = difftime(curr_time, timeout_list[i].time_created);
+    secs_left = (unsigned int)(absolute(timeout_list[i].duration - c_duration));
+    if (i==0) {
+      min_duration = secs_left;
+    }
+    if (secs_left <= min_duration) {
+      min_duration = secs_left;
+      if (pid != nullptr) {
+        *pid = timeout_list[i].process_id;
+      }
+    }
+  }
+  return min_duration;
+}
+
+SmallShell::SmallShell(): new_p("smash>"), plastPwd(nullptr), timeouts(TimeoutsList()) {
 // TODO: add your implementation
   std::list<JobsList::JobEntry*>* job_list = new std::list<JobsList::JobEntry*>();
   this->jobs = new JobsList(job_list);
@@ -680,13 +800,28 @@ Command* SmallShell::CreateCommand(const char* cmd_line) {
       return new BackgroundCommand(cmd_line, this->jobs);
     }
     else if (firstWord.compare("cat") == 0) {
-      return new CatCommand(cmd_line, this->jobs);
+      return new CatCommand(cmd_line);
+    }
+    else if (firstWord.compare("timeout") == 0) {
+      char** args = new char*[COMMAND_MAX_ARGS + 1];
+      int i;
+      _parseCommandLine(cmd_line, args);
+      unsigned int duration = stoi(string(args[1]));
+      std::string real_cmd;
+      i = 2;
+      while (args[i]) {
+        real_cmd = real_cmd + string(args[i]) + " ";
+        i++;
+      }
+      cmd_line = real_cmd.c_str();
+      delete[] args;
+      return new ExternalCommand(cmd_line , &(this->timeouts) , this->jobs, duration);
     }
     else if (firstWord.compare("quit") == 0) {
       return new QuitCommand(cmd_line, this->jobs);
     }
     else {
-      return new ExternalCommand(cmd_line);
+      return new ExternalCommand(cmd_line, &(this->timeouts) ,this->jobs);
     }
     return nullptr;
 }
@@ -735,6 +870,16 @@ void SmallShell::executeCommand(const char* cmd_line) {
         cmd->execute();
       }
       else { //parent
+        ExternalCommand* cmd2 = dynamic_cast<ExternalCommand*>(cmd);
+        cmd2->process_id = child_pid;
+        if(cmd2->duration != 0 && cmd2->timeouts != nullptr) {
+          cmd2->timeouts->addTimeout(std::string(cmd->cmd_line), cmd2->process_id, time(NULL), cmd2->duration);
+          pid_t min_pid = 0;
+          unsigned int new_dur = (cmd2->timeouts)->getClosestTimeout(&min_pid);
+          if((cmd2->timeouts)->getSize() == 0 || min_pid == cmd2->process_id) {
+            alarm(new_dur);
+          }
+        }
         if (!bg_cmd) {
           if (!(cmd->args)[0]) {
             if (waitpid(child_pid, &status, WUNTRACED) == -1) {

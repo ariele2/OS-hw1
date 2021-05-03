@@ -10,6 +10,7 @@ void ctrlZHandler(int sig_num) {
 	// TODO: Add your implementation
   JobsList::JobEntry* job = SmallShell::getInstance().curr_fg_p;
   if (!job) {
+    std::cout<< "smash: got ctrl-Z" << std::endl;
     return;
   }
   int pid = job->process_id;
@@ -38,5 +39,20 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num) {
-  // TODO: Add your implementation
+  TimeoutsList::Timeout* c_timeout = ((SmallShell::getInstance()).getTimeoutsList())->findTimeoutByTime(time(nullptr));
+  if(c_timeout == nullptr){
+    return;
+  }
+  cout << "smash: got an alarm"<<endl;
+  cout << "smash: timeout " << c_timeout->duration << c_timeout->cmd_name << " timed out!" << endl;
+  if(c_timeout->process_id != getpid()) {
+    if(kill(c_timeout->process_id , SIGKILL) < 0){
+      perror("smash error: kill failed");
+    }
+  }
+  ((SmallShell::getInstance()).getTimeoutsList())->removeTimeoutByPid(c_timeout->process_id);
+  if (((SmallShell::getInstance()).getTimeoutsList())->getSize() != 0) {
+    unsigned int new_timeout = ((SmallShell::getInstance()).getTimeoutsList())->getClosestTimeout(nullptr);
+    alarm(new_timeout);
+  }
 }
