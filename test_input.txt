@@ -1,2 +1,0 @@
-chprompt hello
-cd ..
