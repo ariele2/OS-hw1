@@ -442,7 +442,7 @@ void BackgroundCommand::execute() {
 }
 
 void JobsList::killAllJobs() {
-
+  this->removeFinishedJobs();
   std::cout << "sending SIGKILL signal to " << getJobsListSize() << " jobs:" <<std::endl;
   for (auto it = job_list->begin(); it != job_list->end(); it++) {
     int p_id = (*it)->process_id;
@@ -482,7 +482,6 @@ void CatCommand::execute() {
 }
 
 void QuitCommand::execute() {
-  jobs->removeFinishedJobs();
   if (!(this->args)[1]) {
     exit(1);
   }
