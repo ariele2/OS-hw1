@@ -1,2 +1,2 @@
-smash> 
-r - main
+smash> smash> hello> hello> hello> hello> smash> smash> smash> sending SIGKILL signal to 1 jobs:
+7433: sleep 10&
