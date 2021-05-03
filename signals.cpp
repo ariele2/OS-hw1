@@ -8,9 +8,9 @@ using namespace std;
 
 void ctrlZHandler(int sig_num) {
 	// TODO: Add your implementation
+  std::cout<< "smash: got ctrl-Z" << std::endl;
   JobsList::JobEntry* job = SmallShell::getInstance().curr_fg_p;
   if (!job) {
-    std::cout<< "smash: got ctrl-Z" << std::endl;
     return;
   }
   int pid = job->process_id;
@@ -20,7 +20,7 @@ void ctrlZHandler(int sig_num) {
   JobsList::JobEntry* new_job = new JobsList::JobEntry(job->cmd_name, pid, job->time_created, true);
   ((SmallShell::getInstance().jobs)->job_list)->push_back(new_job);
   std::cout<< "smash: process " << pid << " was stopped" <<std::endl;
-  std::cout<< "smash: got ctrl-Z" << std::endl;
+  SmallShell::getInstance().curr_fg_p = nullptr;
 }
 
 void ctrlCHandler(int sig_num) {
@@ -34,8 +34,8 @@ void ctrlCHandler(int sig_num) {
   if (kill(pid, SIGINT) != 0) {
     perror("smash error: kill failed");
   }
-  delete job;
   std::cout<< "smash: process " << pid << " was killed" <<std::endl;
+  SmallShell::getInstance().curr_fg_p = nullptr;
 }
 
 void alarmHandler(int sig_num) {
