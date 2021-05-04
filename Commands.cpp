@@ -159,12 +159,12 @@ void prepareRedirection(char** args, bool is_append, int args_num) {
   }
   const char* w_path = w_spath.c_str();
   if (!is_append) {
-    if (open(w_path, O_WRONLY|O_CREAT, S_IWUSR) == -1) {
+    if (open(w_path, O_WRONLY|O_CREAT,0777) == -1) {
       perror("smash error: open failed");
     }
   }
   else {
-    if (open(w_path, O_WRONLY|O_CREAT|O_APPEND, S_IWUSR) == -1) {
+    if (open(w_path, O_WRONLY|O_CREAT|O_APPEND,0777) == -1) {
       perror("smash error: open failed");
     }
   }
@@ -459,7 +459,7 @@ void CatCommand::execute() {
   ssize_t bytes_read;
   while (this->args[i]) {
     std::string curr_file = _trim(string(this->args[i]));
-    int fd = open(curr_file.c_str(), O_RDONLY);
+    int fd = open(curr_file.c_str(), O_RDONLY,0777);
     if (fd == -1) {
       perror("smash error: open failed");
       return;
@@ -899,6 +899,7 @@ void SmallShell::executeCommand(const char* cmd_line) {
           if (waitpid(child_pid, &status, WUNTRACED) == -1) {
             perror("smash error: waitpid failed");
           }
+          jobs->removeFinishedJobs();
           delete this->curr_fg_p;
         }
         else { //it's running in the bg so we need to add it to the job list
