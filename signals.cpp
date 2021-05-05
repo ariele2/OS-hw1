@@ -17,8 +17,8 @@ void ctrlZHandler(int sig_num) {
   if (kill(pid, SIGTSTP) < 0 ) {
     perror("smash error: kill failed");
   }
-  JobsList::JobEntry* new_job = new JobsList::JobEntry(job->cmd_name, pid, job->time_created, true);
-  ((SmallShell::getInstance().jobs)->job_list)->push_back(new_job);
+  JobsList::JobEntry* new_job = new JobsList::JobEntry(job->cmd_name, pid, job->time_created, true, job->pos);
+  (SmallShell::getInstance().jobs)->addJobByPos(job->pos, new_job);
   std::cout<< "smash: process " << pid << " was stopped" <<std::endl;
   SmallShell::getInstance().curr_fg_p = nullptr;
 }
@@ -43,8 +43,8 @@ void alarmHandler(int sig_num) {
   if(c_timeout == nullptr){
     return;
   }
-  cout << "smash: got an alarm"<<endl;
-  cout << "smash: timeout " << c_timeout->duration << c_timeout->cmd_name << " timed out!" << endl;
+  std::cout << "smash: got an alarm" << std::endl;
+  std::cout << "smash: timeout " << c_timeout->duration << c_timeout->cmd_name << " timed out!" << std::endl;
   if(c_timeout->process_id != getpid()) {
     if(kill(c_timeout->process_id , SIGKILL) < 0){
       perror("smash error: kill failed");

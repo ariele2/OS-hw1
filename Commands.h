@@ -109,18 +109,20 @@ class JobsList {
   class JobEntry {
     public:
     JobEntry() = default;
-    JobEntry(std::string cmd_name, int process_id, time_t time_created, bool stopped) : 
-                                    cmd_name(cmd_name), process_id(process_id), time_created(time_created), stopped(stopped) {}
+    JobEntry(std::string cmd_name, int process_id, time_t time_created, bool stopped, int pos) : 
+                                    cmd_name(cmd_name), process_id(process_id), time_created(time_created), stopped(stopped), pos(pos) {}
     std::string cmd_name;
     int process_id;
     time_t time_created;
     bool stopped;
+    int pos;
   };
  public:
   std::list<JobEntry*>* job_list;
-  JobsList(std::list<JobEntry*>* job_list) : job_list(job_list) {}
+  int biggest_job;
+  JobsList(std::list<JobEntry*>* job_list, int biggest_job) : job_list(job_list), biggest_job(biggest_job) {}
   ~JobsList();
-  void addJob(Command* cmd, int child_pid, bool isStopped = false);
+  void addJob(Command* cmd, int child_pid, const char* cmd_line, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();
@@ -130,6 +132,7 @@ class JobsList {
   JobEntry *getLastStoppedJob(int *jobId);
   JobEntry* getJobByPos(int job_pos);
   int getJobsListSize();
+  void addJobByPos(int pos, JobEntry* job);
   // TODO: Add extra methods or modify exisitng ones as needed
 };
 
@@ -207,8 +210,8 @@ class SmallShell {
   private:
     SmallShell();
     std::string new_p;
-    int smash_pid = getpid();
   public:
+    int smash_pid;
     char** plastPwd;
     TimeoutsList timeouts;
     JobsList* jobs; 
